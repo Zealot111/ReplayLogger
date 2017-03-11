@@ -19,9 +19,10 @@ v. 2.08b	01-03-2017 Zealot Добавлен запуск ocap.exe в конце команды COM
 v. 2.09b	01-03-2017 Zealot ocap.exe запускается в отдельном потоке
 v. 2.10b	01-03-2017 Zealot Исправлена ошибка с неправильным парсингом строки для COM
 v. 2.13		03-03-2017 Zealot Логгирование через easylogging++
+v. 2.14		10-03-2017 Zealot Исправления
 */
 
-#define VERSION "v. 2.13"
+#define VERSION "v. 2.14"
 
 #include "easylogging++.h"
 
@@ -32,8 +33,6 @@ v. 2.13		03-03-2017 Zealot Логгирование через easylogging++
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <Windows.h>
-#include <direct.h>
 #include <map>
 #include <unordered_map>
 #include <functional>
@@ -44,10 +43,15 @@ v. 2.13		03-03-2017 Zealot Логгирование через easylogging++
 #include <thread>
 #include <mutex>
 
+#include <Windows.h>
+#include <direct.h>
+#include <process.h>
+
+
 #define CURRENT_LOG_FILENAME L"replays.log"
 #define REPLAY_CDIR     L"Temp"
 #define REPLAY_FILEMASK L"%Y_%m_%d__%H_%M_"
-#define OCAP_EXE_NAME	"ocap.exe"
+#define OCAP_EXE_NAME	L"ocap.exe"
 
 #define CMD_DEBUG			":DEBUG:"
 #define CMD_NEW				":NEW:"
@@ -95,7 +99,7 @@ namespace {
 	vector<string> lines(100); // итоговый массив строчек, 100 - размер в начале работы 
 	string events(""); // events - переменная с евентами, туда будут подклеиваться все евенты
 
-	string ocapCmdLine("");
+	//string ocapCmdLine("");
 }
 
 
@@ -117,7 +121,7 @@ void initializeLogger(bool forcelog = false, int verb_level = 0) {
 	}
 
 	defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,		"false");
-	defaultConf.setGlobally(el::ConfigurationType::Format,					"%datetime %fbase:%line %level %msg");
+	defaultConf.setGlobally(el::ConfigurationType::Format,					"%datetime [%fbase:%line:%func] %level %msg");
 	defaultConf.setGlobally(el::ConfigurationType::MillisecondsWidth,		"4");
 	defaultConf.setGlobally(el::ConfigurationType::MaxLogFileSize,			"104857600"); // 100 Mb
 	
@@ -170,7 +174,7 @@ string commandEVENT(const string &str) {
 }
 
 string commandADD(const string &str) {
-	LOG(INFO) << str;
+	VLOG(1) << str;
 	string::size_type pos;
 	int str_num = stoi(str, &pos); // выделяем номер строки
 	string val = str.substr(pos); // отрезаем оставшуюся часть
@@ -184,7 +188,7 @@ string commandADD(const string &str) {
 		else {
 			lines.at(str_num) += val; // добавляем в наш массив остаток строки
 			string res = makeResponseString(str_num, "OK", "String appended");
-			LOG(INFO) << res;
+			VLOG(1) << res;
 			return res;
 		}
 	}
@@ -261,18 +265,34 @@ string parseOcapParams(const string &string_in, vector<string> &str_out) {
 	return result;
 }
 
-string prepareOcapCommand(const vector<string> & params) {
-	string res(OCAP_EXE_NAME);
-	for (auto &ii : params) {
-		res += " " + ii;
-	}
-	return res;
+
+void runOcap(const wchar_t ** params) {
+	//_P_WAIT _P_DETACH
+	int handle = _wspawnv(_P_DETACH, OCAP_EXE_NAME, params);
+	LOG(TRACE) << params << "h=" << handle;
 }
 
-void runOcap(const string &params) {
-	LOG(TRACE) << params;
-	system(params.c_str());
+void startOcapProcess(vector<string> &ocap_params) {
+	vector<wstring> params;
+	params.push_back(OCAP_EXE_NAME);
+	vector<const wchar_t *> params_ptr;
+	params_ptr.push_back(params.at(0).c_str());
+	for (auto &p : ocap_params) {
+		wstring param(L"");
+		param = param + L"\"" +converter.from_bytes(p) + L"\"";
+		params.push_back(param);
+		params_ptr.push_back(param.c_str());
+	}
+	params_ptr.push_back(nullptr);
+	LOG(INFO) << "Prepared params:" << params;
+	thread jt(runOcap, params_ptr.data());
+	jt.detach();
+	if (jt.joinable())
+		jt.join();
 }
+
+
+
 
 string commandCOM(const string &str_in) {
 	LOG(INFO) << str_in;
@@ -285,7 +305,7 @@ string commandCOM(const string &str_in) {
 	vector<string> ocap_params;
 	const string str = parseOcapParams(str_in, ocap_params);
 	LOG(TRACE) << "str=" << str << "ocap_params=" << ocap_params;
-	ocapCmdLine = prepareOcapCommand(ocap_params);
+	//ocapCmdLine = prepareOcapCommand(ocap_params);
 	
 	currentReplay.seekp(ios_base::beg);
 	currentReplay << str << endl;
@@ -297,9 +317,8 @@ string commandCOM(const string &str_in) {
 	currentReplay.close();
 	commandDEL(str);
 	// запускаем ocap в отдельном треде
-	thread jt(runOcap, ocapCmdLine);
-	jt.detach();
-
+	startOcapProcess(ocap_params);
+	
 	return "[0,'OK','Written to file']";
 }
 

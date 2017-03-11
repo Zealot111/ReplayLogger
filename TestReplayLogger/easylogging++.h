@@ -1,7 +1,7 @@
 //
 //  Bismillah ar-Rahmaan ar-Raheem
 //
-//  Easylogging++ v9.94.1
+//  Easylogging++ v9.94.1z
 //  Single-header only, cross-platform logging library for C++ applications
 //
 //  Copyright (c) 2017 muflihun.com
@@ -267,7 +267,7 @@ ELPP_INTERNAL_DEBUGGING_OUT_INFO << ELPP_INTERNAL_DEBUGGING_MSG(internalInfoStre
 // Function macro ELPP_FUNC
 #undef ELPP_FUNC
 #if ELPP_COMPILER_MSVC  // Visual C++
-#  define ELPP_FUNC __FUNCSIG__
+#  define ELPP_FUNC __FUNCTION__
 #elif ELPP_COMPILER_GCC  // GCC
 #  define ELPP_FUNC __PRETTY_FUNCTION__
 #elif ELPP_COMPILER_INTEL  // Intel C++

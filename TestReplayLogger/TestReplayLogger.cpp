@@ -4,7 +4,10 @@
 #include <iostream>
 #include <Windows.h>
 #include <string>
+#include <cstdio>;
+#include <process.h>
 using namespace std;
+
 
 #include "easylogging++.h"
 
@@ -17,8 +20,21 @@ void test(const char * str, void(__stdcall* function)(char*, size_t, const char*
 }
 
 
+
+wchar_t fkp[] = L"cmd.exe";
+
+static wchar_t * arr[] = {
+	fkp,
+	nullptr
+};
+
 int main()
 {
+
+	LOG(INFO) << "1Старт лога!";
+	LOG(INFO) << L"2Старт лога!";
+
+
 	HMODULE module = LoadLibrary(L"ReplayLogger.dll");
 
 	if (!module)
@@ -37,6 +53,9 @@ int main()
 
 	auto* f = reinterpret_cast<void(__stdcall*)(char*, size_t, const char*)>(farproc);
 
+	
+	//_wspawnv(_P_DETACH, fkp, arr);
+	
 
 
 	test(":VER:test", f);
