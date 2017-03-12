@@ -20,9 +20,10 @@ v. 2.09b	01-03-2017 Zealot ocap.exe запускается в отдельном потоке
 v. 2.10b	01-03-2017 Zealot Исправлена ошибка с неправильным парсингом строки для COM
 v. 2.13		03-03-2017 Zealot Логгирование через easylogging++
 v. 2.14		10-03-2017 Zealot Исправления
+v. 2.15		12-03-2017 Zealot Исправления
 */
 
-#define VERSION "v. 2.14"
+#define VERSION "2.15"
 
 #include "easylogging++.h"
 
@@ -51,7 +52,7 @@ v. 2.14		10-03-2017 Zealot Исправления
 #define CURRENT_LOG_FILENAME L"replays.log"
 #define REPLAY_CDIR     L"Temp"
 #define REPLAY_FILEMASK L"%Y_%m_%d__%H_%M_"
-#define OCAP_EXE_NAME	L"ocap.exe"
+#define OCAP_EXE_NAME	L"TestLogArgs.exe"
 
 #define CMD_DEBUG			":DEBUG:"
 #define CMD_NEW				":NEW:"
@@ -121,7 +122,7 @@ void initializeLogger(bool forcelog = false, int verb_level = 0) {
 	}
 
 	defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,		"false");
-	defaultConf.setGlobally(el::ConfigurationType::Format,					"%datetime [%fbase:%line:%func] %level %msg");
+	defaultConf.setGlobally(el::ConfigurationType::Format,					"%datetime %thread [%fbase:%line:%func] %level %msg");
 	defaultConf.setGlobally(el::ConfigurationType::MillisecondsWidth,		"4");
 	defaultConf.setGlobally(el::ConfigurationType::MaxLogFileSize,			"104857600"); // 100 Mb
 	
@@ -129,9 +130,11 @@ void initializeLogger(bool forcelog = false, int verb_level = 0) {
 	el::Loggers::setDefaultConfigurations(defaultConf);
 	el::Loggers::addFlag(el::LoggingFlag::DisableApplicationAbortOnFatalLog);
 	el::Loggers::addFlag(el::LoggingFlag::AutoSpacing);
+	//el::Loggers::addFlag(el::LoggingFlag::StrictLogFileSizeCheck);
 	el::Loggers::setVerboseLevel(verb_level);
 //	el::Loggers::addFlag(el::LoggingFlag::HierarchicalLogging);
-	LOG(INFO) << "Logging initialized " << VERSION;
+	el::Helpers::validateFileRolling(el::Loggers::getLogger("default"), el::Level::Info);
+	LOG(INFO) << "Logging initialized " << VERSION << " build: " << __TIMESTAMP__;
 }
 
 string makeResponseString(int code, const char * ok, const char * msg) {
@@ -182,7 +185,7 @@ string commandADD(const string &str) {
 		val = val.substr(1);
 		if (lines.size() <= (size_t)str_num) { // если номер больше количества элементов сейчас в массиве, то аргументы некорректны
 			string res = makeResponseString(-str_num, "ER", "Incorrect array index");
-			LOG(ERROR) << res;
+			LOG(ERROR) << str << res;
 			return res;
 		}
 		else {
@@ -194,7 +197,7 @@ string commandADD(const string &str) {
 	}
 	else {
 		string res = makeResponseString(-(int) pos, "ER", "Incorrect sequence");
-		LOG(ERROR) << res;
+		LOG(ERROR) << str << res;
 		return res;
 	}
 }
@@ -267,26 +270,42 @@ string parseOcapParams(const string &string_in, vector<string> &str_out) {
 
 
 void runOcap(const wchar_t ** params) {
-	//_P_WAIT _P_DETACH
-	int handle = _wspawnv(_P_DETACH, OCAP_EXE_NAME, params);
-	LOG(TRACE) << params << "h=" << handle;
+	//_P_WAIT _P_DETACH _P_NOWAITO
+	int handle = _wspawnv(_P_NOWAITO, OCAP_EXE_NAME, params);
+	ofstream ff("runOcp");
+	ff << "Handle " << handle;
+	//LOG(TRACE) << params << "h=" << handle;
 }
 
-void startOcapProcess(vector<string> &ocap_params) {
+void startOcapProcess(const vector<string> ocap_params) {
 	vector<wstring> params;
 	params.push_back(OCAP_EXE_NAME);
 	vector<const wchar_t *> params_ptr;
-	params_ptr.push_back(params.at(0).c_str());
+	//params_ptr.push_back(params.at(0).c_str());
 	for (auto &p : ocap_params) {
 		wstring param(L"");
 		param = param + L"\"" +converter.from_bytes(p) + L"\"";
 		params.push_back(param);
-		params_ptr.push_back(param.c_str());
 	}
+	for (auto &s : params) {
+		params_ptr.push_back(s.c_str());
+	}
+
 	params_ptr.push_back(nullptr);
 	LOG(INFO) << "Prepared params:" << params;
-	thread jt(runOcap, params_ptr.data());
+	runOcap(params_ptr.data());
+	/*thread jt(runOcap, params_ptr.data());
 	jt.detach();
+	if (jt.joinable())
+		jt.join();*/
+}
+
+void startOcapExe(const vector<string> &ocap_params) {
+	//startOcapProcess(ocap_params);
+	
+	thread jt(startOcapProcess, ocap_params);
+	jt.detach();
+	LOG(INFO) << "Joinable" << jt.joinable();
 	if (jt.joinable())
 		jt.join();
 }
@@ -317,7 +336,7 @@ string commandCOM(const string &str_in) {
 	currentReplay.close();
 	commandDEL(str);
 	// запускаем ocap в отдельном треде
-	startOcapProcess(ocap_params);
+	startOcapExe(ocap_params);
 	
 	return "[0,'OK','Written to file']";
 }
@@ -366,7 +385,6 @@ end:
 	VLOG(2) << output_s;
 }
 
-// Normal Windows DLL junk...
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved
@@ -377,25 +395,17 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 	case DLL_PROCESS_ATTACH: {
 		initializeLogger();
 		int res = _wmkdir(REPLAY_CDIR);
-		LOG(INFO) << "Logger initialized," << "making dir" << REPLAY_CDIR << "result=" << res;
-		
-
-		//commands[CMD_DEBUG] = commandDEBUG;
-/*		commands[CMD_NEW] = commandNEW;
-		commands[CMD_EVENT] = commandEVENT;
-		commands[CMD_FILE] = commandFILE;
-		commands[CMD_ADD] = commandADD;
-		commands[CMD_DEFAULT] = commandDEFAULT;
-		commands[CMD_COM] = commandCOM;
-		commands[CMD_DEL] = commandDEL;*/
-		//commands[CMD_VER] = commandVER;
-
+		const wchar_t *cwd = _wgetcwd(nullptr, 0);
+		wstring scwd(cwd);
+		std::free((void *)cwd);
+		LOG(INFO) << "Logger initialized," << "making dir" << REPLAY_CDIR << "result=" << res << " CWD=" << scwd;
 		break;
 	}
 
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH: {
+		el::Loggers::flushAll();
 		break;
 
 	}

@@ -4,7 +4,7 @@
 #include <iostream>
 #include <Windows.h>
 #include <string>
-#include <cstdio>;
+#include <cstdio>
 #include <process.h>
 using namespace std;
 
@@ -64,7 +64,7 @@ int main()
 	test(":DEBUG:1", f);
 	test(":DEBUG:ON", f);
 	test(":FILE:new mission", f);
-	test(":COM:{first parameter;second parameter;123456}just left string", f);
+	test(":COM:{first parameter;second parameter;32;123456}just left string", f);
 
 	return 0;
 }
