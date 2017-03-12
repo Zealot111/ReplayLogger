@@ -145,12 +145,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="easylogging++.cc" />
     <ClCompile Include="TestLogArgs.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="easylogging++.h" />
-    <ClInclude Include="easylogging_setup.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -4,16 +4,25 @@
 #include "windows.h"
 #include <iostream>
 #include <fstream>
+#include <iomanip>
+#include <locale>
+#include <codecvt>
 
-#include "easylogging++.h"
+using namespace std;
 
 int wmain(int argc, wchar_t *argv[])
 {
-	fostre
-	LOG(INFO) << "TestLogArgs " << L"запущен argc= " << argc;
+	SYSTEMTIME lt;
+	GetLocalTime(&lt);
+	std::wofstream flog(L"TestLogArgs.log",ios_base::binary);
+	flog.imbue(std::locale(flog.getloc(), new std::codecvt_utf16<wchar_t, 0x10ffff, std::little_endian>));
+
+	flog << L"TestLogArgs " << L"запущен argc= " << argc << endl;
+	flog << setfill(L'0') << setw(2)  << lt.wHour << ":" << setfill(L'0') << setw(2) << lt.wMinute << ":" << setfill(L'0') << setw(2) << lt.wSecond << "." << setfill(L'0') << setw(3) <<lt.wMilliseconds << " ";
 	for (int i = 0; i < argc; i++) {
-		LOG(INFO) << argv[i];
+		flog << argv[i];
 	}
+	
     return 0;
 }
 
