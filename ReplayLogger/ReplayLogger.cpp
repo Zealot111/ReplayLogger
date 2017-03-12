@@ -21,9 +21,10 @@ v. 2.10b	01-03-2017 Zealot Исправлена ошибка с неправильным парсингом строки для
 v. 2.13		03-03-2017 Zealot Логгирование через easylogging++
 v. 2.14		10-03-2017 Zealot Исправления
 v. 2.15		12-03-2017 Zealot Исправления
+v. 2.16		12-03-2017 Zealot Исправления, wspawn не потокобезопасна, приводит к крашам при запуске из worker thread
 */
 
-#define VERSION "2.15"
+#define VERSION "2.16"
 
 #include "easylogging++.h"
 
@@ -52,7 +53,7 @@ v. 2.15		12-03-2017 Zealot Исправления
 #define CURRENT_LOG_FILENAME L"replays.log"
 #define REPLAY_CDIR     L"Temp"
 #define REPLAY_FILEMASK L"%Y_%m_%d__%H_%M_"
-#define OCAP_EXE_NAME	L"TestLogArgs.exe"
+#define OCAP_EXE_NAME	L"ocap.exe"
 
 #define CMD_DEBUG			":DEBUG:"
 #define CMD_NEW				":NEW:"
@@ -270,11 +271,7 @@ string parseOcapParams(const string &string_in, vector<string> &str_out) {
 
 
 void runOcap(const wchar_t ** params) {
-	//_P_WAIT _P_DETACH _P_NOWAITO
-	int handle = _wspawnv(_P_NOWAITO, OCAP_EXE_NAME, params);
-	ofstream ff("runOcp");
-	ff << "Handle " << handle;
-	//LOG(TRACE) << params << "h=" << handle;
+	int handle = _wspawnv(_P_DETACH, OCAP_EXE_NAME, params);
 }
 
 void startOcapProcess(const vector<string> ocap_params) {
@@ -301,13 +298,13 @@ void startOcapProcess(const vector<string> ocap_params) {
 }
 
 void startOcapExe(const vector<string> &ocap_params) {
-	//startOcapProcess(ocap_params);
+	startOcapProcess(ocap_params);
 	
-	thread jt(startOcapProcess, ocap_params);
+/*	thread jt(startOcapProcess, ocap_params);
 	jt.detach();
 	LOG(INFO) << "Joinable" << jt.joinable();
 	if (jt.joinable())
-		jt.join();
+		jt.join();*/
 }
 
 
